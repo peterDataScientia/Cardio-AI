@@ -177,6 +177,6 @@ with tab2:
 st.markdown("---")
 st.markdown("""
 <div style="position: fixed; bottom: 8px; width: 100%; text-align: center; margin-bottom: 60px;">
-    Developed by Peter et al. (2026) | UDSM RIW 2026 Showcase
+    Developed by Peter et al. (2026) | Chemistry with AI
 </div>
 """, unsafe_allow_html=True)
