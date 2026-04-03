@@ -55,9 +55,9 @@ st.sidebar.info(
 # -------------------------
 # Main Page Header
 # -------------------------
-st.markdown("<h1 style='text-align: center;'>🧪 TNF-α Inhibitor Prediction Platform</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>🧪 AI-Powered Platform for </h1>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align: center;'>AI-Powered Bioactivity Classification<br>"
+    "<p style='text-align: center;'>AI-Powered Digital Platform for Predicting Cardioprotective Drug Candidates Targeting Tumour Necrosis Factor Alpha Inhibition Mechanism<br>"
     "Random Forest | Morgan Fingerprints | Applicability Domain</p>",
     unsafe_allow_html=True
 )
