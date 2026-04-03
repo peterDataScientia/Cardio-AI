@@ -1,0 +1,11 @@
+rdkit==2025.09.1
+pandas==2.3.3
+numpy==2.3.4
+scikit-learn==1.8.0
+streamlit==1.56.0
+joblib==1.5.2
+matplotlib==3.10.7
+seaborn==0.13.2
+plotly==6.5.0
+flask==3.1.2
+flask-cors==6.0.2
