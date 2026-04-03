@@ -18,24 +18,28 @@ st.set_page_config(
 )
 
 # -------------------------
-# Custom CSS for Layout & Styling
+# CSS Styling
 # -------------------------
 st.markdown("""
 <style>
 body { font-family: 'Segoe UI', sans-serif; background-color: #f9f9f9; }
-h1, h2, h3, h4 { color: #1f77b4; text-align: center; }
+h1, h2, h3 { color: #1f77b4; text-align: center; }
 .stButton>button, .stDownloadButton>button {
     border-radius: 8px; height: 40px; font-weight: bold;
 }
 .stButton>button { background-color: #1f77b4; color: white; }
 .stDownloadButton>button { background-color: #ff7f0e; color: white; }
+.badge-active {background-color: #28a745; color: white; padding: 5px 12px; border-radius: 5px;}
+.badge-inactive {background-color: #dc3545; color: white; padding: 5px 12px; border-radius: 5px;}
+.badge-ad-ok {background-color: #17a2b8; color: white; padding: 5px 12px; border-radius: 5px;}
+.badge-ad-out {background-color: #ffc107; color: black; padding: 5px 12px; border-radius: 5px;}
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------
-# Header with optional logo
+# Header
 # -------------------------
-col1, col2 = st.columns([1,5])
+col1, col2 = st.columns([1, 5])
 with col1:
     if os.path.exists("LOGO.png"):
         st.image("LOGO.png", width=120)
@@ -44,8 +48,7 @@ with col2:
     st.markdown(
         "<p style='text-align: center;'>AI-Powered Bioactivity Classification<br>"
         "Random Forest | Morgan Fingerprints | Applicability Domain<br>"
-        "Developed by Peter et al. (2026)</p>",
-        unsafe_allow_html=True
+        "Developed by Peter et al. (2026)</p>", unsafe_allow_html=True
     )
 
 st.markdown("---")
@@ -55,8 +58,8 @@ st.markdown("---")
 # -------------------------
 st.sidebar.title("About")
 st.sidebar.info(
-    "Predict TNF-α inhibitory activity from SMILES input "
-    "and assess reliability using molecular similarity."
+    "Predict TNF-α inhibitory activity from SMILES input and assess reliability "
+    "using molecular similarity. Supports single compounds and batch CSV upload."
 )
 st.sidebar.markdown("### 👨‍🔬 Developer")
 st.sidebar.info("Peter et al. (2026)")
@@ -75,40 +78,37 @@ n_bits = 1024
 def smiles_to_fp(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
-        return None, None
+        return None
     fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits)
     arr = np.zeros((n_bits,), dtype=int)
     from rdkit.DataStructs.cDataStructs import ConvertToNumpyArray
     ConvertToNumpyArray(fp, arr)
-    return arr.reshape(1, -1), mol
+    return arr.reshape(1, -1)
 
 def tanimoto_similarity_numpy(fp, train_fps):
     fp = fp.astype(bool)
     train_fps = train_fps.astype(bool)
     intersection = np.logical_and(train_fps, fp).sum(axis=1)
     union = np.logical_or(train_fps, fp).sum(axis=1)
-    similarity = intersection / (union + 1e-8)
-    return np.max(similarity)
+    return np.max(intersection / (union + 1e-8))
 
 def predict_single(smiles):
-    fp, mol = smiles_to_fp(smiles)
+    fp = smiles_to_fp(smiles)
     if fp is None:
         return None
-    prediction = model.predict(fp)[0]
-    probabilities = model.predict_proba(fp)[0]
-    confidence = np.max(probabilities) * 100
+    pred = model.predict(fp)[0]
+    prob = model.predict_proba(fp)[0]
+    confidence = np.max(prob)*100
     sim_score = tanimoto_similarity_numpy(fp.flatten(), train_fps)
     threshold = 0.30
-    ad_status = "✅ Inside Applicability Domain" if sim_score >= threshold else "⚠️ Outside Applicability Domain"
-    class_labels = {0: "Inactive", 1: "Active"}
-    pred_label = class_labels.get(prediction, str(prediction))
+    ad_status = "Inside AD" if sim_score >= threshold else "Outside AD"
     return {
         "SMILES": smiles,
-        "Prediction": pred_label,
-        "Confidence (%)": confidence,
+        "Prediction": pred,
+        "Confidence": confidence,
         "AD_Status": ad_status,
         "Max_Tanimoto": sim_score,
-        "Probabilities": probabilities
+        "Probabilities": prob
     }
 
 def predict_batch(smiles_list):
@@ -120,56 +120,82 @@ def predict_batch(smiles_list):
     return pd.DataFrame(results)
 
 # -------------------------
-# Input Tabs
+# Tabs
 # -------------------------
-st.subheader("🔬 Input Options")
-tab1, tab2 = st.tabs(["Single Compound", "Batch Prediction"])
+st.subheader("🔬 Prediction Modes")
+tab1, tab2, tab3 = st.tabs(["Single Prediction", "Batch Prediction", "Exploratory Analysis"])
 
-# ---------- Single Compound ----------
+# ---------- Single ----------
 with tab1:
-    smiles_input = st.text_input("Enter SMILES string:", placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O")
+    smiles = st.text_input("Enter SMILES string:", placeholder="CC(=O)Oc1ccccc1C(=O)O")
     if st.button("Predict Single Compound"):
-        result = predict_single(smiles_input)
+        result = predict_single(smiles)
         if result is None:
-            st.error("❌ Invalid SMILES string")
+            st.error("❌ Invalid SMILES")
         else:
-            st.markdown("### 📊 Prediction Results")
-            st.metric("Predicted Class", result['Prediction'])
-            st.metric("Confidence (%)", f"{result['Confidence (%)']:.2f}")
-            st.metric("Applicability Domain", result['AD_Status'])
+            # Styled badges
+            pred_badge = f"<span class='badge-active'>Active</span>" if result['Prediction']==1 else f"<span class='badge-inactive'>Inactive</span>"
+            ad_badge = f"<span class='badge-ad-ok'>Inside AD</span>" if result['AD_Status']=="Inside AD" else f"<span class='badge-ad-out'>Outside AD</span>"
+            
+            st.markdown("### Prediction Results")
+            st.markdown(f"**Predicted Class:** {pred_badge}", unsafe_allow_html=True)
+            st.markdown(f"**Applicability Domain:** {ad_badge}", unsafe_allow_html=True)
+            st.metric("Confidence (%)", f"{result['Confidence']:.2f}")
             st.write(f"Max Tanimoto Similarity: {result['Max_Tanimoto']:.2f}")
-            prob_dict = {"Inactive": result['Probabilities'][0], "Active": result['Probabilities'][1]}
-            st.bar_chart(pd.DataFrame(prob_dict, index=[0]))
+            
+            st.bar_chart(pd.DataFrame({
+                "Inactive": [result['Probabilities'][0]],
+                "Active": [result['Probabilities'][1]]
+            }))
 
-# ---------- Batch Prediction ----------
+# ---------- Batch ----------
 with tab2:
-    uploaded_file = st.file_uploader("Upload CSV/TXT with Compound_ID and SMILES", type=["csv", "txt"])
+    uploaded_file = st.file_uploader("Upload CSV/TXT with Compound_ID and SMILES", type=["csv","txt"])
     if uploaded_file:
-        try:
-            if uploaded_file.name.endswith(".csv"):
-                df = pd.read_csv(uploaded_file, header=0)
-            else:
-                df = pd.read_csv(uploaded_file, sep="\t", header=0)
-            smiles_list = df.iloc[:,1].tolist()
-            results_df = predict_batch(smiles_list)
-            results_df.insert(0, "Compound_ID", df.iloc[:,0])
-            st.markdown("### 📊 Batch Prediction Results")
-            st.dataframe(results_df.drop(columns=["Probabilities"]))
-            csv_buffer = BytesIO()
-            results_df.drop(columns=["Probabilities"]).to_csv(csv_buffer, index=False)
-            csv_buffer.seek(0)
-            st.download_button("⬇️ Download CSV", data=csv_buffer, file_name="tnf_alpha_predictions.csv", mime="text/csv")
-        except Exception as e:
-            st.error(f"❌ Error reading file: {e}")
+        df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_csv(uploaded_file, sep="\t")
+        smiles_list = df.iloc[:,1].tolist()
+        results_df = predict_batch(smiles_list)
+        results_df.insert(0,"Compound_ID",df.iloc[:,0])
+        
+        # Interactive slider to filter by confidence
+        min_conf = st.slider("Minimum Confidence (%) for display", 0, 100, 0)
+        filtered = results_df[results_df['Confidence'] >= min_conf]
+        
+        def badge(val, ad):
+            return f"<span class='badge-active'>Active</span>" if val==1 else f"<span class='badge-inactive'>Inactive</span>", \
+                   f"<span class='badge-ad-ok'>Inside AD</span>" if ad=="Inside AD" else f"<span class='badge-ad-out'>Outside AD</span>"
+        
+        filtered["Pred_Class"] = [badge(r,a)[0] for r,a in zip(filtered['Prediction'], filtered['AD_Status'])]
+        filtered["AD_Badge"] = [badge(r,a)[1] for r,a in zip(filtered['Prediction'], filtered['AD_Status'])]
+        
+        st.markdown("### Batch Prediction Results")
+        st.dataframe(filtered.drop(columns=["Probabilities","Prediction","AD_Status"]), use_container_width=True)
+        
+        # Download
+        csv_buffer = BytesIO()
+        filtered.drop(columns=["Probabilities"]).to_csv(csv_buffer, index=False)
+        csv_buffer.seek(0)
+        st.download_button("⬇️ Download Filtered CSV", data=csv_buffer, file_name="tnf_alpha_batch.csv", mime="text/csv")
+
+# ---------- Exploratory Analysis ----------
+with tab3:
+    st.markdown("### Interactive Data Exploration")
+    st.info("Upload batch SMILES CSV to see summary stats and visualize prediction distribution.")
+    uploaded_file2 = st.file_uploader("Upload CSV for Analysis", type=["csv"], key="analysis")
+    if uploaded_file2:
+        df2 = pd.read_csv(uploaded_file2)
+        st.write("**Summary Stats:**")
+        st.write(df2.describe())
+        if "Prediction" in df2.columns:
+            st.bar_chart(df2['Prediction'].value_counts())
+        if "Confidence" in df2.columns:
+            st.line_chart(df2['Confidence'])
 
 # -------------------------
 # Footer
 # -------------------------
 st.markdown("---")
 st.markdown(
-    """
-    <div style="position: fixed; bottom: 8px; width: 100%; text-align: center;">
-        Developed by Peter et al. (2026) | UDSM RIW 2026 Showcase
-    </div>
-    """, unsafe_allow_html=True
+    "<div style='text-align:center;'>Developed by Peter et al. (2026) | UDSM RIW 2026 Showcase</div>",
+    unsafe_allow_html=True
 )
