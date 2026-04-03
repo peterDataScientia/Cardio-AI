@@ -1,10 +1,10 @@
-# app.py (Streamlit-ready, RDKit headless compatible)
+# app.py (Streamlit-ready, no RDKit drawing)
 import streamlit as st
 import numpy as np
 import pandas as pd
 import joblib
 from rdkit import Chem
-from rdkit.Chem import AllChem, Draw
+from rdkit.Chem import AllChem
 from io import BytesIO
 
 # -------------------------
@@ -119,7 +119,6 @@ def predict_single(smiles):
         "Confidence (%)": confidence,
         "AD_Status": ad_status,
         "Max_Tanimoto": sim_score,
-        "MolObj": mol,
         "Probabilities": probabilities
     }
 
@@ -130,12 +129,6 @@ def predict_batch(smiles_list):
         if res:
             results.append(res)
     return pd.DataFrame(results)
-
-def mol_to_image(mol, size=(300, 300)):
-    if mol is None:
-        return None
-    img = Draw.MolToImage(mol, size=size)
-    return img
 
 # -------------------------
 # Input Tabs
@@ -156,18 +149,14 @@ with tab1:
         else:
             st.markdown("---")
             st.subheader("📊 Prediction Results")
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                st.metric("Predicted Class", result['Prediction'])
-                st.metric("Confidence (%)", f"{result['Confidence (%)']:.2f}")
-                st.metric("Applicability Domain", result['AD_Status'])
-                st.write(f"Max Tanimoto Similarity: {result['Max_Tanimoto']:.2f}")
-                st.write("### Probability Distribution")
-                prob_dict = {"Inactive": result['Probabilities'][0], "Active": result['Probabilities'][1]}
-                st.bar_chart(pd.DataFrame(prob_dict, index=[0]))
-            with col2:
-                img = mol_to_image(result['MolObj'], size=(300, 300))
-                st.image(img, caption="2D Structure")
+            st.metric("Predicted Class", result['Prediction'])
+            st.metric("Confidence (%)", f"{result['Confidence (%)']:.2f}")
+            st.metric("Applicability Domain", result['AD_Status'])
+            st.write(f"Max Tanimoto Similarity: {result['Max_Tanimoto']:.2f}")
+            st.write("### Probability Distribution")
+            prob_dict = {"Inactive": result['Probabilities'][0], "Active": result['Probabilities'][1]}
+            st.bar_chart(pd.DataFrame(prob_dict, index=[0]))
+            st.write(f"SMILES: `{result['SMILES']}`")
 
 # ---------- Batch Prediction ----------
 with tab2:
@@ -191,11 +180,11 @@ with tab2:
             
             st.markdown("---")
             st.subheader("📊 Batch Prediction Results")
-            st.dataframe(results_df.drop(columns=["MolObj", "Probabilities"]))
+            st.dataframe(results_df.drop(columns=["Probabilities"]))
             
             # Download button
             csv_buffer = BytesIO()
-            results_df.drop(columns=["MolObj", "Probabilities"]).to_csv(csv_buffer, index=False)
+            results_df.drop(columns=["Probabilities"]).to_csv(csv_buffer, index=False)
             csv_buffer.seek(0)
             st.download_button(
                 "⬇️ Download CSV",
