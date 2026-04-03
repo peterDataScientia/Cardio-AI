@@ -5,6 +5,7 @@ import pandas as pd
 import joblib
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from rdkit.DataStructs.cDataStructs import ConvertToNumpyArray
 from io import BytesIO
 import os
 
@@ -18,7 +19,7 @@ st.set_page_config(
 )
 
 # -------------------------
-# Custom CSS for Layout & Styling
+# Custom CSS
 # -------------------------
 st.markdown("""
 <style>
@@ -33,9 +34,9 @@ h1, h2, h3, h4 { color: #1f77b4; text-align: center; }
 """, unsafe_allow_html=True)
 
 # -------------------------
-# Header with optional logo
+# Header with Logo & Optional Developer Photo
 # -------------------------
-col1, col2 = st.columns([1,5])
+col1, col2, col3 = st.columns([1,5,1])
 with col1:
     if os.path.exists("LOGO.png"):
         st.image("LOGO.png", width=120)
@@ -43,10 +44,12 @@ with col2:
     st.markdown("<h1>🧪 TNF-α Inhibitor Prediction Platform</h1>", unsafe_allow_html=True)
     st.markdown(
         "<p style='text-align: center;'>AI-Powered Bioactivity Classification<br>"
-        "Random Forest | Morgan Fingerprints | Applicability Domain<br>"
-        "Developed by Peter et al. (2026)</p>",
+        "Random Forest | Morgan Fingerprints | Applicability Domain</p>",
         unsafe_allow_html=True
     )
+with col3:
+    if os.path.exists("DEVELOPER.jpeg"):
+        st.image("DEVELOPER.jpeg", width=100)
 
 st.markdown("---")
 
@@ -59,13 +62,16 @@ st.sidebar.info(
     "and assess reliability using molecular similarity."
 )
 st.sidebar.markdown("### 👨‍🔬 Developer")
-st.sidebar.info("Peter et al. (2026)")
+if os.path.exists("DEVELOPER.jpeg"):
+    st.sidebar.image("DEVELOPER.jpeg", width=150, caption="Peter et al. (2026)")
+else:
+    st.sidebar.info("Peter et al. (2026)")
 
 # -------------------------
-# Load Model + Training FP
+# Load Model & Fingerprints
 # -------------------------
 model = joblib.load("random_forest_model.pkl")
-train_fps = np.load("train_fingerprints.npy")
+train_fps = np.load("train_fingerprints.npy")  # shape: (n_samples, 1024)
 radius = 2
 n_bits = 1024
 
@@ -78,15 +84,15 @@ def smiles_to_fp(smiles):
         return None, None
     fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits)
     arr = np.zeros((n_bits,), dtype=int)
-    from rdkit.DataStructs.cDataStructs import ConvertToNumpyArray
     ConvertToNumpyArray(fp, arr)
     return arr.reshape(1, -1), mol
 
 def tanimoto_similarity_numpy(fp, train_fps):
-    fp = fp.astype(bool)
-    train_fps = train_fps.astype(bool)
-    intersection = np.logical_and(train_fps, fp).sum(axis=1)
-    union = np.logical_or(train_fps, fp).sum(axis=1)
+    """Compute max Tanimoto similarity between input FP and training FPs"""
+    fp_bool = fp.astype(bool).reshape(-1)
+    train_bool = train_fps.astype(bool)
+    intersection = np.logical_and(train_bool, fp_bool).sum(axis=1)
+    union = np.logical_or(train_bool, fp_bool).sum(axis=1)
     similarity = intersection / (union + 1e-8)
     return np.max(similarity)
 
@@ -97,7 +103,7 @@ def predict_single(smiles):
     prediction = model.predict(fp)[0]
     probabilities = model.predict_proba(fp)[0]
     confidence = np.max(probabilities) * 100
-    sim_score = tanimoto_similarity_numpy(fp.flatten(), train_fps)
+    sim_score = tanimoto_similarity_numpy(fp, train_fps)
     threshold = 0.30
     ad_status = "✅ Inside Applicability Domain" if sim_score >= threshold else "⚠️ Outside Applicability Domain"
     class_labels = {0: "Inactive", 1: "Active"}
@@ -138,8 +144,13 @@ with tab1:
             st.metric("Confidence (%)", f"{result['Confidence (%)']:.2f}")
             st.metric("Applicability Domain", result['AD_Status'])
             st.write(f"Max Tanimoto Similarity: {result['Max_Tanimoto']:.2f}")
-            prob_dict = {"Inactive": result['Probabilities'][0], "Active": result['Probabilities'][1]}
-            st.bar_chart(pd.DataFrame(prob_dict, index=[0]))
+            
+            # Probability bar chart
+            prob_df = pd.DataFrame({
+                "Class": ["Inactive", "Active"],
+                "Probability": result['Probabilities']
+            })
+            st.bar_chart(prob_df.set_index("Class"))
 
 # ---------- Batch Prediction ----------
 with tab2:
@@ -153,8 +164,10 @@ with tab2:
             smiles_list = df.iloc[:,1].tolist()
             results_df = predict_batch(smiles_list)
             results_df.insert(0, "Compound_ID", df.iloc[:,0])
+            
             st.markdown("### 📊 Batch Prediction Results")
             st.dataframe(results_df.drop(columns=["Probabilities"]))
+            
             csv_buffer = BytesIO()
             results_df.drop(columns=["Probabilities"]).to_csv(csv_buffer, index=False)
             csv_buffer.seek(0)
@@ -166,10 +179,8 @@ with tab2:
 # Footer
 # -------------------------
 st.markdown("---")
-st.markdown(
-    """
-    <div style="position: fixed; bottom: 8px; width: 100%; text-align: center;">
-        Developed by Peter et al. (2026) | UDSM RIW 2026 Showcase
-    </div>
-    """, unsafe_allow_html=True
-)
+st.markdown("""
+<div style="position: fixed; bottom: 8px; width: 100%; text-align: center; margin-bottom: 60px;">
+    Developed by Peter et al. (2026) | UDSM RIW 2026 Showcase
+</div>
+""", unsafe_allow_html=True)
