@@ -1,12 +1,11 @@
-# app.py
+# app.py (Streamlit-ready, interactive batch display)
 import streamlit as st
 import numpy as np
 import pandas as pd
 import joblib
 from rdkit import Chem
-from rdkit.Chem import AllChem
 from io import BytesIO
-import os
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 # -------------------------
 # Page Configuration
@@ -18,57 +17,74 @@ st.set_page_config(
 )
 
 # -------------------------
-# CSS Styling
+# Custom CSS for Professional Look
 # -------------------------
 st.markdown("""
 <style>
-body { font-family: 'Segoe UI', sans-serif; background-color: #f9f9f9; }
-h1, h2, h3 { color: #1f77b4; text-align: center; }
-.stButton>button, .stDownloadButton>button {
-    border-radius: 8px; height: 40px; font-weight: bold;
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #f5f5f5;
 }
-.stButton>button { background-color: #1f77b4; color: white; }
-.stDownloadButton>button { background-color: #ff7f0e; color: white; }
-.badge-active {background-color: #28a745; color: white; padding: 5px 12px; border-radius: 5px;}
-.badge-inactive {background-color: #dc3545; color: white; padding: 5px 12px; border-radius: 5px;}
-.badge-ad-ok {background-color: #17a2b8; color: white; padding: 5px 12px; border-radius: 5px;}
-.badge-ad-out {background-color: #ffc107; color: black; padding: 5px 12px; border-radius: 5px;}
+h1, h2, h3, h4 {
+    color: #1f77b4;
+}
+.stButton>button {
+    background-color: #1f77b4;
+    color: white;
+    border-radius: 8px;
+    height: 40px;
+    font-weight: bold;
+}
+.stDownloadButton>button {
+    background-color: #ff7f0e;
+    color: white;
+    border-radius: 8px;
+    height: 40px;
+    font-weight: bold;
+}
+.badge-active {
+    background-color: #2ca02c;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 5px;
+}
+.badge-inactive {
+    background-color: #d62728;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 5px;
+}
+.badge-ad-ok {
+    background-color: #1f77b4;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 5px;
+}
+.badge-ad-out {
+    background-color: #ff7f0e;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 5px;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------
 # Header
 # -------------------------
-col1, col2 = st.columns([1, 5])
-with col1:
-    if os.path.exists("LOGO.png"):
-        st.image("LOGO.png", width=120)
-with col2:
-    st.markdown("<h1>🧪 TNF-α Inhibitor Prediction Platform</h1>", unsafe_allow_html=True)
-    st.markdown(
-        "<p style='text-align: center;'>AI-Powered Bioactivity Classification<br>"
-        "Random Forest | Morgan Fingerprints | Applicability Domain<br>"
-        "Developed by Peter et al. (2026)</p>", unsafe_allow_html=True
-    )
-
-st.markdown("---")
-
-# -------------------------
-# Sidebar
-# -------------------------
-st.sidebar.title("About")
-st.sidebar.info(
-    "Predict TNF-α inhibitory activity from SMILES input and assess reliability "
-    "using molecular similarity. Supports single compounds and batch CSV upload."
+st.title("🧪 TNF-α Inhibitor Prediction Platform")
+st.markdown(
+    "**AI-Powered Bioactivity Classification**  \n"
+    "*Random Forest | Morgan Fingerprints | Applicability Domain*  \n"
+    "*Developed by Peter et al. (2026)*"
 )
-st.sidebar.markdown("### 👨‍🔬 Developer")
-st.sidebar.info("Peter et al. (2026)")
+st.markdown("---")
 
 # -------------------------
 # Load Model + Training FP
 # -------------------------
 model = joblib.load("random_forest_model.pkl")
-train_fps = np.load("train_fingerprints.npy")
+train_fps = np.load("train_fingerprints.npy")  # shape (n,1024)
 radius = 2
 n_bits = 1024
 
@@ -78,124 +94,120 @@ n_bits = 1024
 def smiles_to_fp(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
-        return None
+        return None, None
     fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits)
     arr = np.zeros((n_bits,), dtype=int)
     from rdkit.DataStructs.cDataStructs import ConvertToNumpyArray
     ConvertToNumpyArray(fp, arr)
-    return arr.reshape(1, -1)
+    return arr.reshape(1, -1), mol
 
 def tanimoto_similarity_numpy(fp, train_fps):
     fp = fp.astype(bool)
     train_fps = train_fps.astype(bool)
     intersection = np.logical_and(train_fps, fp).sum(axis=1)
     union = np.logical_or(train_fps, fp).sum(axis=1)
-    return np.max(intersection / (union + 1e-8))
+    similarity = intersection / (union + 1e-8)
+    return np.max(similarity)
 
 def predict_single(smiles):
-    fp = smiles_to_fp(smiles)
+    fp, mol = smiles_to_fp(smiles)
     if fp is None:
         return None
-    pred = model.predict(fp)[0]
-    prob = model.predict_proba(fp)[0]
-    confidence = np.max(prob)*100
+    prediction = model.predict(fp)[0]
+    probabilities = model.predict_proba(fp)[0]
+    confidence = np.max(probabilities) * 100
     sim_score = tanimoto_similarity_numpy(fp.flatten(), train_fps)
     threshold = 0.30
     ad_status = "Inside AD" if sim_score >= threshold else "Outside AD"
+    pred_label = "Active" if prediction == 1 else "Inactive"
     return {
         "SMILES": smiles,
-        "Prediction": pred,
+        "Prediction": pred_label,
         "Confidence": confidence,
-        "AD_Status": ad_status,
-        "Max_Tanimoto": sim_score,
-        "Probabilities": prob
+        "AD_Status": ad_status
     }
 
-def predict_batch(smiles_list):
+def predict_batch(smiles_list, compound_ids=None):
     results = []
-    for smi in smiles_list:
+    for i, smi in enumerate(smiles_list):
         res = predict_single(smi)
         if res:
+            if compound_ids is not None:
+                res["Compound_ID"] = compound_ids[i]
             results.append(res)
-    return pd.DataFrame(results)
+    df = pd.DataFrame(results)
+    
+    # Add HTML badges
+    df["Prediction_Badge"] = df["Prediction"].apply(
+        lambda x: f"<span class='badge-active'>{x}</span>" if x=="Active" else f"<span class='badge-inactive'>{x}</span>"
+    )
+    df["AD_Badge"] = df["AD_Status"].apply(
+        lambda x: f"<span class='badge-ad-ok'>{x}</span>" if x=="Inside AD" else f"<span class='badge-ad-out'>{x}</span>"
+    )
+    return df
 
 # -------------------------
-# Tabs
+# Input Tabs
 # -------------------------
-st.subheader("🔬 Prediction Modes")
-tab1, tab2, tab3 = st.tabs(["Single Prediction", "Batch Prediction", "Exploratory Analysis"])
+tab1, tab2 = st.tabs(["Single Compound", "Batch Prediction"])
 
-# ---------- Single ----------
+# ---------- Single Compound ----------
 with tab1:
-    smiles = st.text_input("Enter SMILES string:", placeholder="CC(=O)Oc1ccccc1C(=O)O")
-    if st.button("Predict Single Compound"):
-        result = predict_single(smiles)
+    smiles_input = st.text_input("Enter SMILES string:", placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O")
+    if st.button("Predict Single Compound", key="single"):
+        result = predict_single(smiles_input)
         if result is None:
-            st.error("❌ Invalid SMILES")
+            st.error("❌ Invalid SMILES string")
         else:
-            # Styled badges
-            pred_badge = f"<span class='badge-active'>Active</span>" if result['Prediction']==1 else f"<span class='badge-inactive'>Inactive</span>"
-            ad_badge = f"<span class='badge-ad-ok'>Inside AD</span>" if result['AD_Status']=="Inside AD" else f"<span class='badge-ad-out'>Outside AD</span>"
-            
             st.markdown("### Prediction Results")
-            st.markdown(f"**Predicted Class:** {pred_badge}", unsafe_allow_html=True)
-            st.markdown(f"**Applicability Domain:** {ad_badge}", unsafe_allow_html=True)
-            st.metric("Confidence (%)", f"{result['Confidence']:.2f}")
-            st.write(f"Max Tanimoto Similarity: {result['Max_Tanimoto']:.2f}")
-            
-            st.bar_chart(pd.DataFrame({
-                "Inactive": [result['Probabilities'][0]],
-                "Active": [result['Probabilities'][1]]
-            }))
+            st.write(f"**Prediction:** {result['Prediction']}")
+            st.write(f"**Confidence (%):** {result['Confidence']:.2f}")
+            st.write(f"**Applicability Domain:** {result['AD_Status']}")
 
-# ---------- Batch ----------
+# ---------- Batch Prediction ----------
 with tab2:
-    uploaded_file = st.file_uploader("Upload CSV/TXT with Compound_ID and SMILES", type=["csv","txt"])
-    if uploaded_file:
-        df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_csv(uploaded_file, sep="\t")
-        smiles_list = df.iloc[:,1].tolist()
-        results_df = predict_batch(smiles_list)
-        results_df.insert(0,"Compound_ID",df.iloc[:,0])
-        
-        # Interactive slider to filter by confidence
-        min_conf = st.slider("Minimum Confidence (%) for display", 0, 100, 0)
-        filtered = results_df[results_df['Confidence'] >= min_conf]
-        
-        def badge(val, ad):
-            return f"<span class='badge-active'>Active</span>" if val==1 else f"<span class='badge-inactive'>Inactive</span>", \
-                   f"<span class='badge-ad-ok'>Inside AD</span>" if ad=="Inside AD" else f"<span class='badge-ad-out'>Outside AD</span>"
-        
-        filtered["Pred_Class"] = [badge(r,a)[0] for r,a in zip(filtered['Prediction'], filtered['AD_Status'])]
-        filtered["AD_Badge"] = [badge(r,a)[1] for r,a in zip(filtered['Prediction'], filtered['AD_Status'])]
-        
-        st.markdown("### Batch Prediction Results")
-        st.dataframe(filtered.drop(columns=["Probabilities","Prediction","AD_Status"]), use_container_width=True)
-        
-        # Download
-        csv_buffer = BytesIO()
-        filtered.drop(columns=["Probabilities"]).to_csv(csv_buffer, index=False)
-        csv_buffer.seek(0)
-        st.download_button("⬇️ Download Filtered CSV", data=csv_buffer, file_name="tnf_alpha_batch.csv", mime="text/csv")
-
-# ---------- Exploratory Analysis ----------
-with tab3:
-    st.markdown("### Interactive Data Exploration")
-    st.info("Upload batch SMILES CSV to see summary stats and visualize prediction distribution.")
-    uploaded_file2 = st.file_uploader("Upload CSV for Analysis", type=["csv"], key="analysis")
-    if uploaded_file2:
-        df2 = pd.read_csv(uploaded_file2)
-        st.write("**Summary Stats:**")
-        st.write(df2.describe())
-        if "Prediction" in df2.columns:
-            st.bar_chart(df2['Prediction'].value_counts())
-        if "Confidence" in df2.columns:
-            st.line_chart(df2['Confidence'])
+    uploaded_file = st.file_uploader("Upload CSV/TXT with Compound_ID and SMILES", type=["csv", "txt"])
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith(".csv"):
+                df = pd.read_csv(uploaded_file, header=0)
+            else:
+                df = pd.read_csv(uploaded_file, sep="\t", header=0)
+            
+            smiles_list = df.iloc[:, 1].tolist()
+            compound_ids = df.iloc[:, 0].tolist()
+            
+            results_df = predict_batch(smiles_list, compound_ids)
+            
+            # Display interactive table with st-aggrid
+            st.markdown("### Batch Prediction Results (Interactive)")
+            gb = GridOptionsBuilder.from_dataframe(results_df[["Compound_ID","Prediction_Badge","AD_Badge","Confidence"]])
+            gb.configure_column("Prediction_Badge", cellRenderer='html')
+            gb.configure_column("AD_Badge", cellRenderer='html')
+            gridOptions = gb.build()
+            AgGrid(results_df[["Compound_ID","Prediction_Badge","AD_Badge","Confidence"]], gridOptions=gridOptions, enable_enterprise_modules=False)
+            
+            # Download CSV
+            csv_buffer = BytesIO()
+            results_df.drop(columns=["Prediction_Badge","AD_Badge"]).to_csv(csv_buffer, index=False)
+            csv_buffer.seek(0)
+            st.download_button(
+                "⬇️ Download CSV",
+                data=csv_buffer,
+                file_name="tnf_alpha_predictions.csv",
+                mime="text/csv"
+            )
+            
+        except Exception as e:
+            st.error(f"❌ Error reading file: {e}")
 
 # -------------------------
 # Footer
 # -------------------------
 st.markdown("---")
-st.markdown(
-    "<div style='text-align:center;'>Developed by Peter et al. (2026) | UDSM RIW 2026 Showcase</div>",
-    unsafe_allow_html=True
+st.caption(
+    "Developed by Peter et al. (2026) | "
+    "Random Forest model trained on Morgan fingerprints (radius=2, 1024-bit) | "
+    "Applicability domain based on Tanimoto similarity | "
+    "UDSM RIW 2026 Showcase"
 )
