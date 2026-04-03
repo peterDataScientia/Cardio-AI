@@ -1,10 +1,10 @@
-# app.py (Streamlit-ready, headless)
+# app.py (Streamlit-ready)
 import streamlit as st
 import numpy as np
 import pandas as pd
 import joblib
 from rdkit import Chem
-
+from rdkit.Chem import AllChem
 from io import BytesIO
 
 # -------------------------
@@ -48,12 +48,16 @@ h1, h2, h3, h4 {
 # -------------------------
 # Header
 # -------------------------
-st.title("🧪 TNF-α Inhibitor Prediction Platform")
-st.markdown(
-    "**AI-Powered Bioactivity Classification**  \n"
-    "*Random Forest | Morgan Fingerprints | Applicability Domain*  \n"
-    "*Developed by Peter et al. (2026)*"
-)
+col1, col2 = st.columns([1, 5])
+with col1:
+    st.image("LOGO.png", width=120)  # ✅ Match exact file name
+with col2:
+    st.title("🧪 TNF-α Inhibitor Prediction Platform")
+    st.markdown(
+        "**AI-Powered Bioactivity Classification**  \n"
+        "*Random Forest | Morgan Fingerprints | Applicability Domain*  \n"
+        "*Developed by Peter et al. (2026)*"
+    )
 
 st.markdown("---")
 
@@ -82,8 +86,8 @@ n_bits = 1024
 def smiles_to_fp(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
-        return None
-    fp = Chem.AllChem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits)
+        return None, None
+    fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits)
     arr = np.zeros((n_bits,), dtype=int)
     from rdkit.DataStructs.cDataStructs import ConvertToNumpyArray
     ConvertToNumpyArray(fp, arr)
@@ -146,13 +150,15 @@ with tab1:
         else:
             st.markdown("---")
             st.subheader("📊 Prediction Results")
-            st.metric("Predicted Class", result['Prediction'])
-            st.metric("Confidence (%)", f"{result['Confidence (%)']:.2f}")
-            st.metric("Applicability Domain", result['AD_Status'])
-            st.write(f"Max Tanimoto Similarity: {result['Max_Tanimoto']:.2f}")
-            st.write("### Probability Distribution")
-            prob_dict = {"Inactive": result['Probabilities'][0], "Active": result['Probabilities'][1]}
-            st.bar_chart(pd.DataFrame(prob_dict, index=[0]))
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.metric("Predicted Class", result['Prediction'])
+                st.metric("Confidence (%)", f"{result['Confidence (%)']:.2f}")
+                st.metric("Applicability Domain", result['AD_Status'])
+                st.write(f"Max Tanimoto Similarity: {result['Max_Tanimoto']:.2f}")
+                st.write("### Probability Distribution")
+                prob_dict = {"Inactive": result['Probabilities'][0], "Active": result['Probabilities'][1]}
+                st.bar_chart(pd.DataFrame(prob_dict, index=[0]))
 
 # ---------- Batch Prediction ----------
 with tab2:
