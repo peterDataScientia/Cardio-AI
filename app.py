@@ -36,10 +36,10 @@ h1, h2, h3, h4 { color: #1f77b4; text-align: center; }
 # -------------------------
 # Header with Logo & Optional Developer Photo
 # -------------------------
-col1, col2, col3 = st.columns([1,5,1])
+col1, col2, = st.columns([1,5])
 with col1:
     if os.path.exists("LOGO.png"):
-        st.image("LOGO.png", width=120)
+        st.image("LOGO.png", width=400, height=400)
 with col2:
     st.markdown("<h1>🧪 TNF-α Inhibitor Prediction Platform</h1>", unsafe_allow_html=True)
     st.markdown(
@@ -47,9 +47,6 @@ with col2:
         "Random Forest | Morgan Fingerprints | Applicability Domain</p>",
         unsafe_allow_html=True
     )
-with col3:
-    if os.path.exists("DEVELOPER.jpeg"):
-        st.image("DEVELOPER.jpeg", width=100)
 
 st.markdown("---")
 
