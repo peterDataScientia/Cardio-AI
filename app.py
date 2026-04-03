@@ -1,11 +1,10 @@
-# app.py
-
+# app.py (Streamlit-ready)
 import streamlit as st
 import numpy as np
 import pandas as pd
 import joblib
 from rdkit import Chem
-from rdkit.Chem import rdFingerprintGenerator, Draw
+from rdkit.Chem import AllChem, Draw
 from io import BytesIO
 
 # -------------------------
@@ -78,7 +77,8 @@ st.sidebar.info("Peter et al. (2026)")
 # -------------------------
 model = joblib.load("random_forest_model.pkl")
 train_fps = np.load("train_fingerprints.npy")  # shape (n,1024)
-morgan_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
+radius = 2
+n_bits = 1024
 
 # -------------------------
 # Functions
@@ -87,8 +87,10 @@ def smiles_to_fp(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return None, None
-    fp = morgan_gen.GetFingerprint(mol)
-    arr = np.array([fp.GetBit(i) for i in range(1024)])
+    fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits)
+    arr = np.zeros((n_bits,), dtype=int)
+    from rdkit.DataStructs.cDataStructs import ConvertToNumpyArray
+    ConvertToNumpyArray(fp, arr)
     return arr.reshape(1, -1), mol
 
 def tanimoto_similarity_numpy(fp, train_fps):
