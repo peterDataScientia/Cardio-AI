@@ -34,35 +34,34 @@ h1, h2, h3, h4 { color: #1f77b4; text-align: center; }
 """, unsafe_allow_html=True)
 
 # -------------------------
-# Header with Logo & Optional Developer Photo
+# Sidebar: Logo + Developer Photo
 # -------------------------
-col1, col2, = st.columns([1,5])
-with col1:
-    if os.path.exists("LOGO.png"):
-        st.image("LOGO.png", width=400, height=400)
-with col2:
-    st.markdown("<h1>🧪 TNF-α Inhibitor Prediction Platform</h1>", unsafe_allow_html=True)
-    st.markdown(
-        "<p style='text-align: center;'>AI-Powered Bioactivity Classification<br>"
-        "Random Forest | Morgan Fingerprints | Applicability Domain</p>",
-        unsafe_allow_html=True
-    )
+if os.path.exists("LOGO.png"):
+    st.sidebar.image("LOGO.png", width=200, use_column_width=False)
 
-st.markdown("---")
-
-# -------------------------
-# Sidebar
-# -------------------------
-st.sidebar.title("About")
-st.sidebar.info(
-    "Predict TNF-α inhibitory activity from SMILES input "
-    "and assess reliability using molecular similarity."
-)
 st.sidebar.markdown("### 👨‍🔬 Developer")
 if os.path.exists("DEVELOPER.jpeg"):
     st.sidebar.image("DEVELOPER.jpeg", width=150, caption="Peter et al. (2026)")
 else:
     st.sidebar.info("Peter et al. (2026)")
+
+st.sidebar.markdown("---")
+st.sidebar.title("About")
+st.sidebar.info(
+    "Predict TNF-α inhibitory activity from SMILES input "
+    "and assess reliability using molecular similarity."
+)
+
+# -------------------------
+# Main Page Header
+# -------------------------
+st.markdown("<h1 style='text-align: center;'>🧪 TNF-α Inhibitor Prediction Platform</h1>", unsafe_allow_html=True)
+st.markdown(
+    "<p style='text-align: center;'>AI-Powered Bioactivity Classification<br>"
+    "Random Forest | Morgan Fingerprints | Applicability Domain</p>",
+    unsafe_allow_html=True
+)
+st.markdown("---")
 
 # -------------------------
 # Load Model & Fingerprints
