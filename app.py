@@ -1,10 +1,10 @@
-# app.py (Streamlit-ready, no RDKit drawing)
+# app.py (Streamlit-ready, headless)
 import streamlit as st
 import numpy as np
 import pandas as pd
 import joblib
 from rdkit import Chem
-from rdkit.Chem import AllChem
+
 from io import BytesIO
 
 # -------------------------
@@ -48,16 +48,12 @@ h1, h2, h3, h4 {
 # -------------------------
 # Header
 # -------------------------
-col1, col2 = st.columns([1, 5])
-with col1:
-    st.image("logo.png", width=120)
-with col2:
-    st.title("🧪 TNF-α Inhibitor Prediction Platform")
-    st.markdown(
-        "**AI-Powered Bioactivity Classification**  \n"
-        "*Random Forest | Morgan Fingerprints | Applicability Domain*  \n"
-        "*Developed by Peter et al. (2026)*"
-    )
+st.title("🧪 TNF-α Inhibitor Prediction Platform")
+st.markdown(
+    "**AI-Powered Bioactivity Classification**  \n"
+    "*Random Forest | Morgan Fingerprints | Applicability Domain*  \n"
+    "*Developed by Peter et al. (2026)*"
+)
 
 st.markdown("---")
 
@@ -86,8 +82,8 @@ n_bits = 1024
 def smiles_to_fp(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
-        return None, None
-    fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits)
+        return None
+    fp = Chem.AllChem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits)
     arr = np.zeros((n_bits,), dtype=int)
     from rdkit.DataStructs.cDataStructs import ConvertToNumpyArray
     ConvertToNumpyArray(fp, arr)
@@ -119,6 +115,7 @@ def predict_single(smiles):
         "Confidence (%)": confidence,
         "AD_Status": ad_status,
         "Max_Tanimoto": sim_score,
+        "MolObj": mol,
         "Probabilities": probabilities
     }
 
@@ -156,7 +153,6 @@ with tab1:
             st.write("### Probability Distribution")
             prob_dict = {"Inactive": result['Probabilities'][0], "Active": result['Probabilities'][1]}
             st.bar_chart(pd.DataFrame(prob_dict, index=[0]))
-            st.write(f"SMILES: `{result['SMILES']}`")
 
 # ---------- Batch Prediction ----------
 with tab2:
@@ -180,11 +176,11 @@ with tab2:
             
             st.markdown("---")
             st.subheader("📊 Batch Prediction Results")
-            st.dataframe(results_df.drop(columns=["Probabilities"]))
+            st.dataframe(results_df.drop(columns=["MolObj", "Probabilities"]))
             
             # Download button
             csv_buffer = BytesIO()
-            results_df.drop(columns=["Probabilities"]).to_csv(csv_buffer, index=False)
+            results_df.drop(columns=["MolObj", "Probabilities"]).to_csv(csv_buffer, index=False)
             csv_buffer.seek(0)
             st.download_button(
                 "⬇️ Download CSV",
