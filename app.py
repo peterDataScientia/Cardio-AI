@@ -1,11 +1,10 @@
-# app.py (Streamlit-ready)
+# app.py (Streamlit-ready, RDKit headless compatible)
 import streamlit as st
 import numpy as np
 import pandas as pd
 import joblib
 from rdkit import Chem
-from rdkit.Chem import AllChem
-from rdkit.Chem.Draw import rdMolDraw2D
+from rdkit.Chem import AllChem, Draw
 from io import BytesIO
 
 # -------------------------
@@ -102,13 +101,6 @@ def tanimoto_similarity_numpy(fp, train_fps):
     similarity = intersection / (union + 1e-8)
     return np.max(similarity)
 
-def mol_to_svg(mol, size=(300, 300)):
-    drawer = rdMolDraw2D.MolDraw2DSVG(size[0], size[1])
-    rdMolDraw2D.PrepareAndDrawMolecule(drawer, mol)
-    drawer.FinishDrawing()
-    svg = drawer.GetDrawingText()
-    return svg
-
 def predict_single(smiles):
     fp, mol = smiles_to_fp(smiles)
     if fp is None:
@@ -139,6 +131,12 @@ def predict_batch(smiles_list):
             results.append(res)
     return pd.DataFrame(results)
 
+def mol_to_image(mol, size=(300, 300)):
+    if mol is None:
+        return None
+    img = Draw.MolToImage(mol, size=size)
+    return img
+
 # -------------------------
 # Input Tabs
 # -------------------------
@@ -168,8 +166,8 @@ with tab1:
                 prob_dict = {"Inactive": result['Probabilities'][0], "Active": result['Probabilities'][1]}
                 st.bar_chart(pd.DataFrame(prob_dict, index=[0]))
             with col2:
-                svg = mol_to_svg(result['MolObj'], size=(300, 300))
-                st.image(svg, caption="2D Structure")
+                img = mol_to_image(result['MolObj'], size=(300, 300))
+                st.image(img, caption="2D Structure")
 
 # ---------- Batch Prediction ----------
 with tab2:

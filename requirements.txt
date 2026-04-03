@@ -7,3 +7,4 @@ joblib==1.5.2
 matplotlib==3.10.7
 seaborn==0.13.2
 plotly==6.5.0
+pillow
