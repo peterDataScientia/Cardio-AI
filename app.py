@@ -8,7 +8,6 @@ from rdkit.Chem import AllChem, Draw
 from rdkit.DataStructs.cDataStructs import ConvertToNumpyArray
 from io import BytesIO
 import os
-from streamlit_drawable_canvas import st_canvas
 
 # -------------------------
 # Page Configuration
@@ -132,33 +131,14 @@ tab1, tab2 = st.tabs(["Single Compound", "Batch Prediction"])
 with tab1:
     st.subheader("🔬 Single Compound Prediction")
 
-    # Input method
-    input_option = st.radio("Select input method:", ("Paste SMILES", "Draw Molecule"))
+    # Paste SMILES (mandatory)
+    smiles_input = st.text_input("Enter SMILES string:", placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O")
 
     mol = None
-    smiles_input = None
-
-    if input_option == "Paste SMILES":
-        smiles_input = st.text_input("Enter SMILES string (mandatory):", placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O")
-    
-    else:  # Draw Molecule
-        st.info("Draw molecule on canvas (visual only). SMILES is still mandatory for prediction.")
-        canvas_result = st_canvas(
-            fill_color="rgba(0, 0, 0, 0)",
-            stroke_width=2,
-            stroke_color="#000000",
-            background_color="#ffffff",
-            height=300,
-            width=300,
-            drawing_mode="freedraw",
-            key="canvas"
-        )
-        smiles_input = st.text_input("Paste SMILES here (mandatory for prediction):", placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O")
-
-    # Validate SMILES and display molecule
     if smiles_input:
         mol = Chem.MolFromSmiles(smiles_input)
         if mol:
+            # Render 2D molecule image
             st.markdown("### 🧬 Molecule Structure")
             st.image(Draw.MolToImage(mol, size=(300, 300)))
         else:
